@@ -1,0 +1,6 @@
+flask
+pandas
+sqlalchemy
+flask_cors
+llama_index
+psycopg2-binary
