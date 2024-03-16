@@ -18,13 +18,12 @@ from llama_index.core.prompts import PromptTemplate
 app = Flask(__name__)
 CORS(app)
 
-os.environ["OPENAI_API_KEY"] = environ.get("OPENAI_API_KEY", "")
-DB_PASS = environ.get("DB_PASS", "")
+os.environ["OPENAI_API_KEY"] = "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"
 
-engine = create_engine(f'postgresql://postgres.msuzsakkwbftgtxwuoim:{DB_PASS}@aws-0-ap-south-1.pooler.supabase.com:5432/postgres')
+engine = create_engine(f'postgresql://postgres.msuzsakkwbftgtxwuoim:fbXhdVUNtIE2fCTt@aws-0-ap-south-1.pooler.supabase.com:5432/postgres')
 
 df = pd.read_csv("https://raw.githubusercontent.com/pranavs6/V_hack/main/ex03.csv")
-
+print(df)
 instruction_str = (
     "1. Convert the query to executable Python code using Pandas.\n"
     "2. The final line of code should be a Python expression that can be called with the `eval()` function.\n"
@@ -106,6 +105,25 @@ def query():
         return jsonify(data)
     except Exception as e:
         connection.close()
+        return jsonify({'error': str(e)})
+
+
+@app.route("/add_data", methods=["POST"])
+def add_data():
+    try:
+        req_data = request.get_json()
+        id = len(df)+1
+        category = req_data.get('category', '')
+        color = req_data.get('color', '')
+        size = req_data.get('size', '')
+        price = req_data.get('price', '')
+        description = req_data.get('description', '')
+
+        # Append new data to DataFrame
+        df.loc[len(df)] = [id, category, color, size, price, description]
+
+        return jsonify({'message': 'Data added successfully'})
+    except Exception as e:
         return jsonify({'error': str(e)})
 
 if __name__ == "__main__":
