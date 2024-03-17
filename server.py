@@ -1,11 +1,12 @@
 import pandas as pd
 import os
-
+import base64
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from os import environ
 from sqlalchemy import create_engine, text
-
+from io import StringIO
+from google.cloud import storage
 from llama_index.core.query_pipeline import (
     QueryPipeline as QP,
     Link,
@@ -18,11 +19,20 @@ from llama_index.core.prompts import PromptTemplate
 app = Flask(__name__)
 CORS(app)
 
-os.environ["OPENAI_API_KEY"] = "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"
+from supabase import create_client, Client
+url="supabase:url:here"
+key="supabas:key:here"
+supabase: Client = create_client(url, key)
 
-engine = create_engine(f'postgresql://postgres.msuzsakkwbftgtxwuoim:fbXhdVUNtIE2fCTt@aws-0-ap-south-1.pooler.supabase.com:5432/postgres')
+res_data = supabase.table('products').select("*").csv().execute()
+dataset=res_data.data
+print(dataset)
+csv_data=StringIO(dataset)
+os.environ["OPENAI_API_KEY"] = "OPENAI_API_KEY"
 
-df = pd.read_csv("https://raw.githubusercontent.com/pranavs6/V_hack/main/ex03.csv")
+engine = create_engine(f'pg:url')
+
+df = pd.read_csv(csv_data)
 print(df)
 instruction_str = (
     "1. Convert the query to executable Python code using Pandas.\n"
@@ -78,6 +88,8 @@ qp.add_links(
 qp.add_link("response_synthesis_prompt", "llm2")
 keys = ['id', 'name', 'img_url', 'price', 'description']
 
+print(df.columns)
+
 @app.route("/query", methods=["POST"])
 def query():
     connection = engine.connect()
@@ -89,18 +101,23 @@ def query():
         if(len(ids) > 2):
             d = str(ids)
             d =  '('+d[1:-1]+')'
-            sql_query = text("SELECT * FROM products WHERE id IN "+d)
+            sql_query = text("SELECT id, name, img_url, price, description FROM products WHERE id IN "+d)
             print(sql_query)
             result = connection.execute(sql_query)
         else:
-            print("Fuckkkk")
+            print("Not_Found")
             result =[]
         data = []
+        print(result)
+        print()
+        print(keys)
         for i in result:
+            print(i)
             new_dict = {}
             for j in range(len(i)):
                 new_dict[keys[j]]= i[j]
             data.append(new_dict)
+        print(data)
         connection.close()
         return jsonify(data)
     except Exception as e:
@@ -112,19 +129,59 @@ def query():
 def add_data():
     try:
         req_data = request.get_json()
+        idx = len(df)+1
         id = len(df)+1
         category = req_data.get('category', '')
         color = req_data.get('color', '')
         size = req_data.get('size', '')
         price = req_data.get('price', '')
         description = req_data.get('description', '')
+        name = req_data.get('name','')
+        retailer = req_data.get('retailer','')
+        img_data = req_data.get('img_data','')
+        image=base64.b64decode(img_data)
+        
 
-        # Append new data to DataFrame
-        df.loc[len(df)] = [id, category, color, size, price, description]
+        try:
+            response = supabase.storage.from_("product-images").update(file=image, path="f"+str(idx)+".jpg", file_options={"content-type": "image/jpeg"})
+        except:
+            response = supabase.storage.from_("product-images").upload(file=image, path="f"+str(idx)+".jpg", file_options={"content-type": "image/jpeg"})
+        res = supabase.storage.from_('product-images').get_public_url('f'+str(idx)+'.jpg')
+        print(res)
+        link=str(res)
+        df.loc[len(df)] = [id, name, link, price, description, retailer, color, size, category]
+
+        response = supabase.table('products').insert({'id':idx,'name':name,'price':price,'description':description,'retailer':retailer,'color':color,'img_url':link,'category':category,'size':size}).execute()
 
         return jsonify({'message': 'Data added successfully'})
     except Exception as e:
         return jsonify({'error': str(e)})
+
+@app.route("/retailers/signup", methods=["POST"])
+def signup():
+    try:
+        req_data = request.get_json()
+        email = req_data.get('email', '').lower()
+        name = req_data.get('name', '')
+        password = req_data.get('password', '')
+        location = req_data.get('location', '')
+        supabase.table('Retailers').insert({"email": email, "name": name,"location":location,"password":password}).execute()
+        return jsonify({'message': 'Signup successful'})
+    except Exception as e:
+        return jsonify({'error': str(e)})
+
+@app.route("/retailers/login", methods=["POST"])
+def login():
+    try:
+        req_data = request.get_json()
+        email = req_data.get('email', '').lower()
+        password = req_data.get('password', '')
+        response = supabase.table('Retailers').select("*").eq('email', email).eq("password", password).execute()
+        data = response.data
+        return jsonify({'data': data})
+    except Exception as e:
+        return jsonify({'error': str(e)})
+
 
 if __name__ == "__main__":
     app.run(debug=True)
