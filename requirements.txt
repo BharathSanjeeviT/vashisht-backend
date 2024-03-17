@@ -4,5 +4,4 @@ sqlalchemy
 flask_cors
 llama_index
 psycopg2-binary
-StringIO
 supabase
