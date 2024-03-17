@@ -104,7 +104,7 @@ def query():
             print(sql_query)
             result = connection.execute(sql_query)
         else:
-            print("Fuckkkk")
+            print("Not Found")
             result =[]
         data = []
         print(result)
