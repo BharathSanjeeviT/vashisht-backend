@@ -6,7 +6,6 @@ from flask_cors import CORS
 from os import environ
 from sqlalchemy import create_engine, text
 from io import StringIO
-from google.cloud import storage
 from llama_index.core.query_pipeline import (
     QueryPipeline as QP,
     Link,
@@ -20,17 +19,17 @@ app = Flask(__name__)
 CORS(app)
 
 from supabase import create_client, Client
-url="supabase:url:here"
-key="supabas:key:here"
+url="supabase_url_here"
+key="supabase_key_here"
 supabase: Client = create_client(url, key)
 
 res_data = supabase.table('products').select("*").csv().execute()
 dataset=res_data.data
 print(dataset)
 csv_data=StringIO(dataset)
-os.environ["OPENAI_API_KEY"] = "OPENAI_API_KEY"
+os.environ["OPENAI_API_KEY"] = "openai_api_key_here"
 
-engine = create_engine(f'pg:url')
+engine = create_engine(f'postgres_url_here')
 
 df = pd.read_csv(csv_data)
 print(df)
@@ -105,7 +104,7 @@ def query():
             print(sql_query)
             result = connection.execute(sql_query)
         else:
-            print("Not_Found")
+            print("Fuckkkk")
             result =[]
         data = []
         print(result)
@@ -176,9 +175,16 @@ def login():
         req_data = request.get_json()
         email = req_data.get('email', '').lower()
         password = req_data.get('password', '')
-        response = supabase.table('Retailers').select("*").eq('email', email).eq("password", password).execute()
-        data = response.data
-        return jsonify({'data': data})
+        response = supabase.table('Retailers').select("*").eq('email', email).execute()
+        data=response.data
+        if response.data==[]:
+            return jsonify({'message':'User not found'})
+        pwd = data[0]["password"]
+        if pwd==password:
+            return jsonify({'message':'True'})
+        else:
+            return jsonify({'message':'False'})
+
     except Exception as e:
         return jsonify({'error': str(e)})
 
